@@ -1,6 +1,7 @@
 // Logging
 use log::{info, warn, error, debug, trace};
 use logos::{Logos, Lexer};
+use core::time;
 use std::num::ParseIntError;
 
 // File reading/writing
@@ -11,6 +12,8 @@ use std::io::{Write, BufReader, BufRead, Error, Lines};
 pub enum LexingError {
     InvalidInteger(String),
     #[default]
+    UnexpectedToken,
+    ImproperTimeFormatting,
     NonAsciiCharacter,
 }
 
@@ -81,8 +84,9 @@ pub enum Token {
     #[token("timescale")]
     Timescale,
 
-    #[regex(r"\d+[np]s")]
-    Time,
+    #[regex(r"\d+ns", nanosecond)]
+    #[regex(r"\d+ps", picosecond)]
+    Time(f64),
 
     #[token("#")]
     Pound,
@@ -178,29 +182,119 @@ pub enum Token {
     Integer(u8),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct Sim {
     fpath: std::path::PathBuf,
     contents: String,
     mods: Vec<Module>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Module {
-
+    sim_time: SimTime,
 }
 
-pub fn parse_sv_file(path: &std::path::PathBuf) -> Result<Module, Error> {
-    let contents = fs::read_to_string(path)?;
+#[derive(Debug, Clone, Copy)]
+pub struct SimTime {
+    n_time: f64,
+    d_time: f64,
+}
 
-    let mut lex = Token::lexer(&contents);
+impl Default for SimTime {
+    fn default() -> Self {
+        Self {
+            n_time: 0.000_001,
+            d_time: 0.000_000_001,
+        }
+    }
+}
 
-    for line in lex.into_iter() {
-        match line {
-            Ok(l) => (),
-            Err(e) => error!("lexing error: {:?}", e)
+pub fn read_sv_file(path: &std::path::PathBuf) -> Result<String, std::io::Error> {
+    Ok(fs::read_to_string(path)?)
+}
+
+pub fn parse_sv_file(file_contents: String) -> Result<Module, LexingError> {
+    let mut lexer = Token::lexer(file_contents.as_str());
+
+    while let Some(token) = lexer.next() {
+        match token {
+            Ok(Token::Module) => (),
+            Ok(Token::BTick) => {
+                match parse_sim_time(&mut lexer) {
+                    Ok(val) => info!("sim time found: {:?}", val),
+                    Err(e) => return Err(e),
+                }
+            }
+            Err(e) => return Err(e),
+            // _ => warn!("{:?} not implemented", token.unwrap()),
+            _ => (),
         }
     }
 
     Ok(Module::default())
+}
+
+fn parse_sim_time<'source>(lexer: &mut Lexer<'source, Token>) -> Result<SimTime, LexingError>{
+    let mut n = 0.;
+    let mut d = 0.;
+    let mut timescale_started = false;
+    let mut n_found = false;
+    let mut n_search = true;
+
+    while let Some(token) = lexer.next() {
+        match token {
+            Ok(Token::Timescale) => {
+                if timescale_started {
+                    return Err(LexingError::UnexpectedToken);
+                }
+
+                timescale_started = true;
+            }
+            Ok(Token::Time(val)) => {
+                if !timescale_started {
+                    return Err(LexingError::UnexpectedToken);
+                }
+
+                if n_search {
+                    if n_found {
+                        return Err(LexingError::ImproperTimeFormatting);
+                    }
+
+                    n = val;
+                    n_found = true;
+                } else {
+                    d = val;
+                    break;
+                }
+            },
+            Ok(Token::Divide) => n_search = false,
+            Err(e) => return Err(e),
+            _ => error!("Unexpected token {:?}", token.unwrap()),
+        }
+    }
+
+    Ok(SimTime {
+        n_time: n,
+        d_time: d,
+    })
+}
+
+fn picosecond(lex: &mut Lexer<Token>) -> Option<f64> {
+    let slice = lex.slice();
+    let n: Result<f64, _> = slice[..slice.len() - 2].parse();
+
+    match n {
+        Ok(val) => Some(val * 0.000_000_001),
+        Err(e) => { error!("could not read picosecond time: {}", e); None} 
+    }
+}
+
+fn nanosecond(lex: &mut Lexer<Token>) -> Option<f64> {
+    let slice = lex.slice();
+    let n: Result<f64, _> = slice[..slice.len() - 2].parse();
+
+    match n {
+        Ok(val) => Some(val * 0.000_001),
+        Err(e) => { error!("could not read nanosecond time: {}", e); None} 
+    }
 }

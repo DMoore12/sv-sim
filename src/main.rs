@@ -40,10 +40,10 @@ fn main() {
         .filter(None, args.log_level)
         .init();
 
-    let input = sv_sim::read_sv_file(&args.input_path);
+    let ret = sv_sim::read_sv_file(&args.input_path);
 
-    match input {
+    match ret {
+        Ok(input) => { sv_sim::parse_sv_file(input).expect("failed to parse input"); },
         Err(e) => error!("encountered an error reading {:?}: '{}'", args.input_path, e),
-        Ok(_) => ()
-    }
+    };
 }
