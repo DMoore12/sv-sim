@@ -57,6 +57,9 @@ pub enum Token {
     #[token("assign")]
     Assign,
 
+    #[token("always_comb")]
+    Comb,
+
     #[token("if")]
     If,
 
@@ -175,12 +178,19 @@ pub enum Token {
     Integer(u8),
 }
 
+#[derive(Default)]
 pub struct Sim {
     fpath: std::path::PathBuf,
     contents: String,
+    mods: Vec<Module>,
 }
 
-pub fn read_sv_file(path: &std::path::PathBuf) -> Result<String, Error> {
+#[derive(Default)]
+pub struct Module {
+
+}
+
+pub fn parse_sv_file(path: &std::path::PathBuf) -> Result<Module, Error> {
     let contents = fs::read_to_string(path)?;
 
     let mut lex = Token::lexer(&contents);
@@ -192,5 +202,5 @@ pub fn read_sv_file(path: &std::path::PathBuf) -> Result<String, Error> {
         }
     }
 
-    Ok(contents)
+    Ok(Module::default())
 }
