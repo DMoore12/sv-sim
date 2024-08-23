@@ -187,7 +187,7 @@ pub fn read_sv_file(path: &std::path::PathBuf) -> Result<String, Error> {
 
     for line in lex.into_iter() {
         match line {
-            Ok(l) => info!("lexing result: {:?}", l),
+            Ok(l) => (),
             Err(e) => error!("lexing error: {:?}", e)
         }
     }
