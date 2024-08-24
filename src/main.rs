@@ -1,8 +1,8 @@
 // Logging
 use chrono::Local;
-use std::io::Write;
 use env_logger::Builder;
-use log::{info, warn, error, debug, trace, LevelFilter};
+use log::{debug, error, info, trace, warn, LevelFilter};
+use std::io::Write;
 
 // Argument parsing
 use clap::Parser;
@@ -11,7 +11,7 @@ use clap::Parser;
 #[command(version, about, long_about = None)]
 struct Cli {
     /// File input path
-    input_path:  std::path::PathBuf,
+    input_path: std::path::PathBuf,
 
     /// File output path
     output_path: std::path::PathBuf,
@@ -30,11 +30,12 @@ fn main() {
 
     Builder::new()
         .format(|buf, record| {
-                writeln!(buf,
-                    "{} [{}] - {}",
-                    Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    record.level(),
-                    record.args()
+            writeln!(
+                buf,
+                "{} [{}] - {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.args()
             )
         })
         .filter(None, args.log_level)
@@ -43,7 +44,17 @@ fn main() {
     let ret = sv_sim::read_sv_file(&args.input_path);
 
     match ret {
-        Ok(input) => { sv_sim::parse_sv_file(input).expect("failed to parse input"); },
-        Err(e) => error!("encountered an error reading {:?}: '{}'", args.input_path, e),
+        Ok(input) => {
+            match sv_sim::parse_sv_file(input) {
+                Ok(object) => {
+                    format!("{object:?}");
+                }
+                Err(_) => (),
+            };
+        }
+        Err(e) => error!(
+            "encountered an error reading {:?}: '{}'",
+            args.input_path, e
+        ),
     };
 }
