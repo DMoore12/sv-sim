@@ -1,3 +1,6 @@
+#![doc = include_str!("../README.md")]
+#![doc(html_logo_url = "https://github.com/DMoore12/sv-sim/blob/main/sv-sim-logo.png?raw=true")]
+
 /// Logging
 use log::{debug, error, trace, warn};
 use logos::{Lexer, Logos};
@@ -260,13 +263,13 @@ pub enum Token {
 
     /// Binary value
     ///
-    /// Takes form X'bY where X is the bit width and Y is the desired value
+    /// Takes form `X'bY` where `X` is the bit width and `Y` is the desired value
     #[regex(r"\d+'b\d+")]
     BinaryValue,
 
     /// Hi-Z value
     ///
-    /// Takes form X'bz where X is the bit width
+    /// Takes form `X'bz` where `X` is the bit width
     #[regex(r"\d+'bz")]
     HiZValue,
 
