@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/DMoore12/sv-sim/main/sv-sim-logo.png?token=GHSAT0AAAAAACVVGZS3WYZBM4BLXJO6ORAWZWKNUJA")]
+#![doc(html_logo_url = "https://github.com/DMoore12/sv-sim/blob/main/sv-sim-logo.png?raw=true")]
 
 /// Logging
 use log::{debug, error, trace, warn};
