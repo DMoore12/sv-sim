@@ -1,7 +1,6 @@
 use crate::{LexingError, Token};
-use log::{debug, error, info, trace, warn};
+use log::{error, trace};
 use logos::Lexer;
-use std::fmt;
 
 #[derive(Default, Debug, Clone)]
 pub struct Input {

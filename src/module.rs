@@ -11,13 +11,13 @@ use std::fmt;
 #[derive(Default)]
 pub struct Module {
     /// Module friendly name
-    name: String,
+    pub name: String,
 
     /// Module I/O information
-    io: ModuleIO,
+    pub io: ModuleIO,
 
     /// Module "variables" (wire, reg, etc.)
-    vars: Vec<Var>,
+    pub vars: Vec<Var>,
 }
 
 impl fmt::Debug for Module {
@@ -31,6 +31,7 @@ impl fmt::Debug for Module {
     }
 }
 
+/// Parses a module to completion
 pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module, LexingError> {
     let mut in_wire = false;
     let mut in_reg = false;
@@ -151,10 +152,17 @@ pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module
 /// Stores all inputs, outputs, and inouts for a given module
 #[derive(Default)]
 pub struct ModuleIO {
-    name: String,
-    inputs: Vec<Input>,
-    outputs: Vec<Output>,
-    inouts: Vec<Inout>,
+    /// Module name
+    pub name: String,
+
+    /// Module inputs
+    pub inputs: Vec<Input>,
+
+    /// Module outputs
+    pub outputs: Vec<Output>,
+
+    // Module combination input/outputs
+    pub inouts: Vec<Inout>,
 }
 
 impl fmt::Debug for ModuleIO {
@@ -173,6 +181,7 @@ impl fmt::Debug for ModuleIO {
     }
 }
 
+/// Parses a module I/O block to completion
 fn parse_module_io<'source>(lexer: &mut Lexer<'source, Token>) -> Result<ModuleIO, LexingError> {
     #[derive(Default)]
     enum State {

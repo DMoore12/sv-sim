@@ -1,12 +1,14 @@
 // Logging
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, error, info, trace, warn, LevelFilter};
+use log::{info, error, LevelFilter};
 use std::io::Write;
 
 // Argument parsing
 use clap::Parser;
 
+/// SystemVerilog simulation tool. Takes a single file as an output and produces
+/// an object file in the same directory by default
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -14,10 +16,10 @@ struct Cli {
     input_path: std::path::PathBuf,
 
     /// File output path
-    output_path: std::path::PathBuf,
+    output_path: Option<std::path::PathBuf>,
 
     /// Sets logging level (0 = off ... 4 = trace)
-    #[arg(short, long, default_value_t = LevelFilter::Info)]
+    #[arg(short, long, default_value_t = LevelFilter::Error)]
     log_level: LevelFilter,
 
     /// Enables verbose file output
@@ -47,6 +49,7 @@ fn main() {
         Ok(input) => {
             match sv_sim::parse_sv_file(input) {
                 Ok(object) => {
+                    info!("succesfully parsed input file {}", &args.input_path.display());
                     format!("{object:?}");
                 }
                 Err(_) => (),
