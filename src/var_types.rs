@@ -41,17 +41,21 @@ impl From<&str> for VarType {
 #[derive(Default, Debug, Clone)]
 pub struct Var {
     pub name: String,
+    pub width: u64,
     pub var_type: VarType,
     pub state: bool,
     pub hi_z: bool,
 }
 
 pub fn parse_input<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Input, LexingError> {
+    trace!("parsing input");
+
     match parse_var(lexer) {
-        Ok((var_type, name)) => Ok(Input {
+        Ok((var_type, name, width)) => Ok(Input {
             name: name.to_owned(),
             var: Var {
                 name: name.to_owned(),
+                width,
                 var_type,
                 state: false,
                 hi_z: false,
@@ -68,11 +72,14 @@ pub fn parse_input<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Input, 
 }
 
 pub fn parse_output<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Output, LexingError> {
+    trace!("parsing output");
+
     match parse_var(lexer) {
-        Ok((var_type, name)) => Ok(Output {
+        Ok((var_type, name, width)) => Ok(Output {
             name: name.to_owned(),
             var: Var {
                 name: name.to_owned(),
+                width,
                 var_type,
                 state: false,
                 hi_z: false,
@@ -89,11 +96,14 @@ pub fn parse_output<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Output
 }
 
 pub fn parse_inout<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Inout, LexingError> {
+    trace!("parsing inout");
+
     match parse_var(lexer) {
-        Ok((var_type, name)) => Ok(Inout {
+        Ok((var_type, name, width)) => Ok(Inout {
             name: name.to_owned(),
             var: Var {
                 name: name.to_owned(),
+                width,
                 var_type,
                 state: false,
                 hi_z: false,
@@ -111,15 +121,22 @@ pub fn parse_inout<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Inout, 
 
 pub fn parse_var<'source>(
     lexer: &mut Lexer<'source, Token>,
-) -> Result<(VarType, String), LexingError> {
+) -> Result<(VarType, String, u64), LexingError> {
+    let mut width: u64 = 1;
     let mut var_type = VarType::default();
+
+    trace!("parsing variable");
 
     while let Some(token) = lexer.next() {
         match token {
             Ok(Token::Wire) => var_type = VarType::Wire,
             Ok(Token::Reg) => var_type = VarType::Reg,
             Ok(Token::Word) => match parse_name(lexer) {
-                Ok(name) => return Ok((var_type, name)),
+                Ok(name) => return Ok((var_type, name, width)),
+                Err(e) => return Err(e),
+            },
+            Ok(Token::OpenBracket) => match parse_width(lexer) {
+                Ok(val) => width = val,
                 Err(e) => return Err(e),
             },
             Ok(Token::Comment) => match crate::parse_comment(lexer) {
@@ -146,14 +163,14 @@ pub fn parse_var<'source>(
 pub fn parse_name<'source>(lexer: &mut Lexer<'source, Token>) -> Result<String, LexingError> {
     let mut name = lexer.slice().to_owned();
 
+    trace!("parsing variable name");
+
     while let Some(token) = lexer.next() {
         match token {
             Ok(Token::Word) => name += lexer.slice(),
             Ok(Token::Underscore) => name += "_",
-            Ok(Token::WhiteSpace)
-            | Ok(Token::Newline)
-            | Ok(Token::Semicolon)
-            | Ok(Token::Comma) => return Ok(name),
+            Ok(Token::WhiteSpace) | Ok(Token::Newline) => (),
+            Ok(Token::Semicolon) | Ok(Token::Comma) => return Ok(name),
             Err(e) => {
                 error!(
                     "unexpected error occurred parsing variable name: '{}'",
@@ -166,4 +183,50 @@ pub fn parse_name<'source>(lexer: &mut Lexer<'source, Token>) -> Result<String, 
     }
 
     Ok(name)
+}
+
+fn parse_width<'source>(lexer: &mut Lexer<'source, Token>) -> Result<u64, LexingError> {
+    let mut start = 0;
+    let mut end = 0;
+    let mut end_found = false;
+
+    trace!("parsing variable width");
+
+    while let Some(token) = lexer.next() {
+        match token {
+            Ok(Token::Integer(val)) => {
+                if !end_found {
+                    end = val;
+                    end_found = true;
+                } else {
+                    start = val;
+                }
+            }
+            Ok(Token::Colon) | Ok(Token::WhiteSpace) => (),
+            Ok(Token::CloseBracket) => {
+                if end < start {
+                    error!(
+                        "cannot assign a negative width to var (start: {}, end: {})",
+                        start, end
+                    );
+                    return Err(LexingError::NegativeBitWidth);
+                }
+
+                return Ok(end - start + 1);
+            }
+            Err(e) => {
+                error!(
+                    "unexpected error occurred parsing variable width: '{}'",
+                    lexer.slice()
+                );
+                return Err(e);
+            }
+            _ => error!(
+                "unexpected value in variable width parsing, got {:?}",
+                token.unwrap()
+            ),
+        }
+    }
+
+    Err(LexingError::IncompleteWidth)
 }

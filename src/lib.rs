@@ -9,6 +9,9 @@ use std::fs;
 // Debug
 use std::fmt;
 
+pub mod module;
+use module::*;
+
 pub mod var_types;
 use var_types::*;
 
@@ -27,6 +30,25 @@ pub enum LexingError {
 
     /// Non ASCII character found (not currently used)
     NonAsciiCharacter,
+
+    /// Bit width opened but not closed
+    IncompleteWidth,
+
+    /// Bit width determined to be negative
+    NegativeBitWidth,
+}
+
+impl Into<String> for LexingError {
+    fn into(self) -> String {
+        match self {
+            Self::InvalidInteger(error) => format!("invalid integer encountered: {error:}"),
+            Self::UnexpectedToken => "unexpected token encountered".to_owned(),
+            Self::ImproperTimeFormatting => "improper time format encountered".to_owned(),
+            Self::IncompleteWidth => "incomplete width encountered".to_owned(),
+            Self::NegativeBitWidth => "negative bit width encountered".to_owned(),
+            _ => "generic/unknown error encountered".to_owned(),
+        }
+    }
 }
 
 /// Error type returned by calling lex.slice().parse() to u8
@@ -242,7 +264,7 @@ pub enum Token {
     HiZValue,
 
     /// Comment start
-    #[regex(r"//.*\n")]
+    #[regex(r"//")]
     Comment,
 
     /// Generic text
@@ -251,7 +273,7 @@ pub enum Token {
 
     /// Integer value
     #[regex(r"[0-9]+", |lex| lex.slice().parse())]
-    Integer(u8),
+    Integer(u64),
 }
 
 /// Reads a SystemVerilog file to string for parsing
@@ -322,135 +344,13 @@ pub fn parse_sv_file(file_contents: String) -> Result<SimObject, LexingError> {
     }
 
     for error in errors {
-        error!("lexing error parsing sv file: {:?}", error);
+        error!(
+            "lexing error parsing sv file: {}",
+            <LexingError as Into<String>>::into(error)
+        );
     }
 
     Ok(SimObject { sim_time, mods })
-}
-
-/// SystemVerilog module representation
-///
-/// Contains a module I/O header, variable assignments, combinational
-/// and sequential logic, as well as any constants
-#[derive(Default)]
-pub struct Module {
-    /// Module friendly name
-    name: String,
-
-    /// Module I/O information
-    io: ModuleIO,
-
-    /// Module "variables" (wire, reg, etc.)
-    vars: Vec<Var>,
-}
-
-impl fmt::Debug for Module {
-    fn fmt(&self, _: &mut std::fmt::Formatter) -> fmt::Result {
-        debug!("Module {:?}", self.name);
-        format!("{0:?}", self.io);
-        for var in self.vars.clone() {
-            debug!("{:?}", var);
-        }
-        Ok(())
-    }
-}
-
-fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module, LexingError> {
-    let mut in_wire = false;
-    let mut in_reg = false;
-    let mut vars: Vec<Var> = Vec::new();
-
-    let io = match parse_module_io(lexer) {
-        Ok(ret) => ret,
-        Err(_) => ModuleIO::default(),
-    };
-
-    while let Some(token) = lexer.next() {
-        if in_wire {
-            match token {
-                Ok(Token::Word) => match parse_name(lexer) {
-                    Ok(name) => {
-                        vars.push(Var {
-                            name,
-                            var_type: VarType::Wire,
-                            ..Default::default()
-                        });
-                        in_wire = false;
-                    }
-                    Err(_) => error!(
-                        "unexpected error occurred parsing module wire: '{}'",
-                        lexer.slice()
-                    ),
-                },
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module wire: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => debug!("wire search throwing out {:?}", token),
-            }
-            continue;
-        } else if in_reg {
-            match token {
-                Ok(Token::Word) => match parse_name(lexer) {
-                    Ok(name) => {
-                        vars.push(Var {
-                            name,
-                            var_type: VarType::Reg,
-                            ..Default::default()
-                        });
-                        in_reg = false;
-                    }
-                    Err(_) => error!(
-                        "unexpected error occurred parsing module name: '{}'",
-                        lexer.slice()
-                    ),
-                },
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module reg: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => (),
-            }
-            continue;
-        }
-
-        match token {
-            Ok(Token::Wire) => in_wire = true,
-            Ok(Token::Reg) => in_reg = true,
-            Ok(Token::Comment) => match parse_comment(lexer) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module comment: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-            },
-            Ok(Token::EndModule) => break,
-            Err(e) => {
-                error!(
-                    "unexpected error occurred parsing sv file: '{}'",
-                    lexer.slice()
-                );
-                return Err(e);
-            }
-            // _ => warn!("{:?} not implemented", token.unwrap()),
-            _ => (),
-        }
-    }
-
-    Ok(Module {
-        name: io.name.to_owned(),
-        io,
-        vars,
-    })
 }
 
 /// Simulation time command
@@ -537,6 +437,8 @@ fn picosecond(lex: &mut Lexer<Token>) -> Option<f64> {
     let slice = lex.slice();
     let n: Result<f64, _> = slice[..slice.len() - 2].parse();
 
+    trace!("parsing picosecond");
+
     match n {
         Ok(val) => Some(val * 0.000_000_001),
         Err(e) => {
@@ -550,6 +452,8 @@ fn nanosecond(lex: &mut Lexer<Token>) -> Option<f64> {
     let slice = lex.slice();
     let n: Result<f64, _> = slice[..slice.len() - 2].parse();
 
+    trace!("parsing nanosecond");
+
     match n {
         Ok(val) => Some(val * 0.000_001),
         Err(e) => {
@@ -559,166 +463,15 @@ fn nanosecond(lex: &mut Lexer<Token>) -> Option<f64> {
     }
 }
 
-/// Module I/O information
-///
-/// Stores all inputs, outputs, and inouts for a given module
-#[derive(Default)]
-pub struct ModuleIO {
-    name: String,
-    inputs: Vec<Input>,
-    outputs: Vec<Output>,
-    inouts: Vec<Inout>,
-}
-
-impl fmt::Debug for ModuleIO {
-    fn fmt(&self, _: &mut std::fmt::Formatter) -> fmt::Result {
-        debug!("ModuleIO {:?}", self.name);
-        for input in self.inputs.clone() {
-            debug!("{:?}", input);
-        }
-        for output in self.outputs.clone() {
-            debug!("{:?}", output);
-        }
-        for inout in self.inouts.clone() {
-            debug!("{:?}", inout);
-        }
-        Ok(())
-    }
-}
-
-fn parse_module_io<'source>(lexer: &mut Lexer<'source, Token>) -> Result<ModuleIO, LexingError> {
-    #[derive(Default)]
-    enum State {
-        #[default]
-        Name,
-        Paren,
-        IO,
-        Semi,
-    }
-
-    let mut state = State::default();
-    let mut name = String::default();
-    let mut inputs: Vec<Input> = Vec::new();
-    let mut outputs: Vec<Output> = Vec::new();
-    let mut inouts: Vec<Inout> = Vec::new();
-
-    while let Some(token) = lexer.next() {
-        match state {
-            State::Name => match token {
-                Ok(Token::Word) => {
-                    name = lexer.slice().to_owned();
-                    state = State::Paren;
-                }
-                Ok(Token::WhiteSpace) => (),
-                Ok(Token::Newline) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module name: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => error!("expected module name, got {:?}", token.unwrap()),
-            },
-            State::Paren => match token {
-                Ok(Token::OpenParen) => state = State::IO,
-                Ok(Token::WhiteSpace) => (),
-                Ok(Token::Newline) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module open paren: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => error!("expected '(', got {:?}", token.unwrap()),
-            },
-            State::IO => match token {
-                Ok(Token::Input) => {
-                    match parse_input(lexer) {
-                        Ok(var) => inputs.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module input: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Output) => {
-                    match parse_output(lexer) {
-                        Ok(var) => outputs.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module output: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Inout) => {
-                    match parse_inout(lexer) {
-                        Ok(var) => inouts.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module inout: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Comment) => match parse_comment(lexer) {
-                    _ => (),
-                },
-                Ok(Token::CloseParen) => state = State::Semi,
-                Ok(Token::WhiteSpace) => (),
-                Ok(Token::Newline) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => error!("expected I/O declaration or ')', got {:?}", token.unwrap()),
-            },
-            State::Semi => match token {
-                Ok(Token::Semicolon) => break,
-                Ok(Token::WhiteSpace) => (),
-                Ok(Token::Newline) => (),
-                Ok(Token::Comment) => match parse_comment(lexer) {
-                    _ => (),
-                },
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module semicolon: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => error!("expected ';', got {:?}", token.unwrap()),
-            },
-        };
-    }
-
-    Ok(ModuleIO {
-        name,
-        inputs,
-        outputs,
-        inouts,
-    })
-}
-
 fn parse_comment<'source>(lexer: &mut Lexer<'source, Token>) -> Result<(), LexingError> {
+    trace!("parsing comment");
+
     while let Some(token) = lexer.next() {
         match token {
             Ok(Token::Newline) => return Ok(()),
             Err(e) => {
                 error!(
-                    "unexpected error occurred parsing module semicolon: '{}'",
+                    "unexpected error occurred parsing comment: '{}'",
                     lexer.slice()
                 );
                 return Err(e);

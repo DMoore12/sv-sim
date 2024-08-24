@@ -6,7 +6,7 @@ module top
    input wire n_rst,                   // Reset button (used for counting here)
    output reg [7:0] led,               // User controllable LEDs
    input wire usb_rx,                  // FTDI RX pin
-   output wire usb_tx                  // FTDI TX pin
+   output wire usb_tx,                  // FTDI TX pin
 );
 
    assign usb_tx = usb_rx;             // Mirror input to output
