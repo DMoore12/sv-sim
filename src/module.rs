@@ -35,10 +35,7 @@ impl fmt::Debug for Module {
 pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module, LexingError> {
     let mut vars: Vec<Var> = Vec::new();
 
-    let io = match parse_module_io(lexer) {
-        Ok(ret) => ret,
-        Err(_) => ModuleIO::default(),
-    };
+    let io = parse_module_io(lexer)?;
 
     trace!("parsing module");
 
@@ -46,16 +43,7 @@ pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module
         match token {
             Ok(Token::Wire) => vars.push(parse_module_var(lexer, VarType::Wire)?),
             Ok(Token::Reg) => vars.push(parse_module_var(lexer, VarType::Reg)?),
-            Ok(Token::Comment) => match parse_comment(lexer) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module comment: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-            },
+            Ok(Token::Comment) => parse_comment(lexer)?,
             Ok(Token::WhiteSpace) => (),
             Ok(Token::EndModule) => break,
             Err(e) => {
@@ -87,27 +75,14 @@ fn parse_module_var<'source>(
 
     while let Some(token) = lexer.next() {
         match token {
-            Ok(Token::Word) => match parse_name(lexer) {
-                Ok(name) => {
-                    return Ok(Var {
-                        name,
-                        var_type,
-                        width,
-                        ..Default::default()
-                    });
-                }
-                Err(_) => {
-                    error!(
-                        "unexpected error occurred parsing module wire name: '{}'",
-                        lexer.slice()
-                    );
-                    break;
-                }
-            },
+            Ok(Token::Word) => return Ok(Var {
+                name: parse_name(lexer)?,
+                var_type,
+                width,
+                ..Default::default()
+            }),
             Ok(Token::OpenBracket) => width = var_types::parse_width(lexer)?,
-            Ok(Token::Comment) => match crate::parse_comment(lexer) {
-                _ => (),
-            },
+            Ok(Token::Comment) => crate::parse_comment(lexer)?,
             Ok(Token::WhiteSpace) => (),
             Err(e) => {
                 error!(
@@ -208,45 +183,10 @@ fn parse_module_io<'source>(lexer: &mut Lexer<'source, Token>) -> Result<ModuleI
                 _ => error!("expected '(', got {:?}", token.unwrap()),
             },
             State::IO => match token {
-                Ok(Token::Input) => {
-                    match parse_input(lexer) {
-                        Ok(var) => inputs.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module input: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Output) => {
-                    match parse_output(lexer) {
-                        Ok(var) => outputs.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module output: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Inout) => {
-                    match parse_inout(lexer) {
-                        Ok(var) => inouts.push(var),
-                        Err(e) => {
-                            error!(
-                                "unexpected error occurred parsing module inout: '{}'",
-                                lexer.slice()
-                            );
-                            return Err(e);
-                        }
-                    };
-                }
-                Ok(Token::Comment) => match parse_comment(lexer) {
-                    _ => (),
-                },
+                Ok(Token::Input) => inputs.push(parse_input(lexer)?),
+                Ok(Token::Output) => outputs.push(parse_output(lexer)?),
+                Ok(Token::Inout) => inouts.push(parse_inout(lexer)?),
+                Ok(Token::Comment) => parse_comment(lexer)?,
                 Ok(Token::CloseParen) => state = State::Semi,
                 Ok(Token::WhiteSpace) => (),
                 Ok(Token::Newline) => (),
@@ -263,9 +203,7 @@ fn parse_module_io<'source>(lexer: &mut Lexer<'source, Token>) -> Result<ModuleI
                 Ok(Token::Semicolon) => break,
                 Ok(Token::WhiteSpace) => (),
                 Ok(Token::Newline) => (),
-                Ok(Token::Comment) => match parse_comment(lexer) {
-                    _ => (),
-                },
+                Ok(Token::Comment) => parse_comment(lexer)?,
                 Err(e) => {
                     error!(
                         "unexpected error occurred parsing module semicolon: '{}'",

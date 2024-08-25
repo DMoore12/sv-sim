@@ -34,8 +34,14 @@ pub enum LexingError {
     #[default]
     UnexpectedToken,
 
+    /// Unexpected token, expected semicolon
+    ExpectedSemi,
+
     /// Improper time format found
     ImproperTimeFormatting,
+
+    /// Improper comment format found
+    ImproperCommentFormatting,
 
     /// Non ASCII character found (not currently used)
     NonAsciiCharacter,
@@ -326,24 +332,14 @@ pub fn parse_sv_file(file_contents: String) -> Result<SimObject, LexingError> {
     let mut lexer = Token::lexer(file_contents.as_str());
     let mut sim_time = SimTime::default();
     let mut mods: Vec<Module> = Vec::new();
-    let mut errors: Vec<LexingError> = Vec::new();
 
     trace!("parsing sv file");
 
     while let Some(token) = lexer.next() {
         match token {
-            Ok(Token::Module) => match parse_module(&mut lexer) {
-                Ok(module) => mods.push(module),
-                Err(e) => errors.push(e),
-            },
-            Ok(Token::BTick) => match parse_sim_time(&mut lexer) {
-                Ok(val) => sim_time = val,
-                Err(e) => errors.push(e),
-            },
-            Ok(Token::Comment) => match parse_comment(&mut lexer) {
-                Ok(_) => (),
-                Err(e) => errors.push(e),
-            },
+            Ok(Token::Module) => mods.push(parse_module(&mut lexer)?),
+            Ok(Token::BTick) => sim_time = parse_sim_time(&mut lexer)?,
+            Ok(Token::Comment) => parse_comment(&mut lexer)?,
             Ok(Token::Newline) | Ok(Token::WhiteSpace) => (),
             Err(e) => {
                 error!(
@@ -356,13 +352,6 @@ pub fn parse_sv_file(file_contents: String) -> Result<SimObject, LexingError> {
         }
     }
 
-    for error in errors {
-        error!(
-            "lexing error parsing sv file: {}",
-            <LexingError as Into<String>>::into(error)
-        );
-    }
-
     Ok(SimObject { sim_time, mods })
 }
 
@@ -372,12 +361,12 @@ fn parse_comment<'source>(lexer: &mut Lexer<'source, Token>) -> Result<(), Lexin
     while let Some(token) = lexer.next() {
         match token {
             Ok(Token::Newline) => return Ok(()),
-            Err(e) => {
+            Err(_) => {
                 error!(
                     "unexpected error occurred parsing comment: '{}'",
                     lexer.slice()
                 );
-                return Err(e);
+                return Err(LexingError::ImproperCommentFormatting);
             }
             _ => (),
         };
