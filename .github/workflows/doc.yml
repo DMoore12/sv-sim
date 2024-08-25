@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Update script permissions
-      run: sudo chmod +x generate_docs.sh
+    - name: Init submodules
+      run: git submodule update
     - name: Build docs
-      run: ./generate_docs.sh
+      run: cargo rustdoc --lib -- --extend-css Better-Rust-Documentation/Better\ Rust\ documentation\ Dark\ Theme.css
