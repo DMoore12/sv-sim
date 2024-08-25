@@ -2,7 +2,7 @@
 
 _A simple SystemVerilog simulation tool written in rust_
 
-## Project Scopt
+## Project Scope
 
 - Provide a simple SystemVerilog parser
 - Provide simple analysis tools
@@ -11,7 +11,6 @@ _A simple SystemVerilog simulation tool written in rust_
 ## Repository Contents
 
 - [src](https://github.com/DMoore12/sv-sim/tree/main/src): source files
-
 - [sv](https://github.com/DMoore12/sv-sim/tree/main/sv): example SystemVerilog files for testing
 
 ## Installation
@@ -25,6 +24,13 @@ git clone https://github.com/DMoore12/sv-sim.git
 # Initialize submodules
 cd ./sv-sim
 git submodule init
+
+# Run test file
+cargo run -- ./sv/cu_top.sv none
+
+# Generate documentation
+sudo chmod +x generate_docs.sh
+./generate_docs.sh
 ```
 
 ## Usage
