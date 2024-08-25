@@ -1,7 +1,7 @@
 // Logging
 use chrono::Local;
 use env_logger::Builder;
-use log::{info, error, LevelFilter};
+use log::{error, info, LevelFilter};
 use std::io::Write;
 
 // Argument parsing
@@ -49,7 +49,10 @@ fn main() {
         Ok(input) => {
             match sv_sim::parse_sv_file(input) {
                 Ok(object) => {
-                    info!("succesfully parsed input file {}", &args.input_path.display());
+                    info!(
+                        "succesfully parsed input file {}",
+                        &args.input_path.display()
+                    );
                     format!("{object:?}");
                 }
                 Err(_) => (),
