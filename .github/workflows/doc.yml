@@ -19,4 +19,6 @@ jobs:
     - name: Init submodules
       run: git submodule update
     - name: Build docs
-      run: cargo rustdoc --lib -- --extend-css Better-Rust-Documentation/Better\ Rust\ documentation\ Dark\ Theme.css
+      run: cargo rustdoc --lib
+    - name: Build docs (with theme)
+      run: cargo rustdoc --lib -- --extend-css "Better-Rust-Documentation/Better Rust documentation Dark Theme.css"
