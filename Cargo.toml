@@ -5,6 +5,7 @@ edition = "2021"
 description = "A simple SystemVerilog simulation tool written in rust"
 repository = "https://github.com/DMoore12/sv-sim"
 readme = "README.md"
+license = "MIT"
 categories = ["compilers", "parsing", "simulation"]
 keywords = ["systemverilog", "systemverilog-simulation"]
 exclude = [".*"]
