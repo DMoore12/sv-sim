@@ -7,7 +7,7 @@ repository = "https://github.com/DMoore12/sv-sim"
 readme = "README.md"
 license = "MIT"
 categories = ["compilers", "parsing", "simulation"]
-keywords = ["systemverilog", "systemverilog-simulation"]
+keywords = ["systemverilog", "sv-sim", "sv"]
 exclude = [".*", "Better-Rust-Documentation*", "generate_docs.sh", "sv/*"]
 
 [badges]
