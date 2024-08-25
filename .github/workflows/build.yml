@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    paths:
+      -src/**
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
