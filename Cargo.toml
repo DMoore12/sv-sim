@@ -8,7 +8,7 @@ readme = "README.md"
 license = "MIT"
 categories = ["compilers", "parsing", "simulation"]
 keywords = ["systemverilog", "systemverilog-simulation"]
-exclude = [".*"]
+exclude = [".*", "Better-Rust-Documentation*", "generate_docs.sh", "sv/*"]
 
 [badges]
 maintenance = { status = "..." }
