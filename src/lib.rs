@@ -45,6 +45,9 @@ pub enum LexingError {
 
     /// Bit width determined to be negative
     NegativeBitWidth,
+
+    /// Module wire parsing failed
+    ModuleWireNotFound,
 }
 
 impl Into<String> for LexingError {

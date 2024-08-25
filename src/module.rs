@@ -1,4 +1,4 @@
-use crate::var_types::*;
+use crate::var_types::{self, *};
 use crate::{parse_comment, LexingError, Token};
 use log::{debug, error, trace};
 use logos::Lexer;
@@ -22,10 +22,10 @@ pub struct Module {
 
 impl fmt::Debug for Module {
     fn fmt(&self, _: &mut std::fmt::Formatter) -> fmt::Result {
-        debug!("Module {:?}", self.name);
+        debug!("MODULE: {:?}", self.name);
         format!("{0:?}", self.io);
         for var in self.vars.clone() {
-            debug!("{:?}", var);
+            debug!("VAR: {:?}", var);
         }
         Ok(())
     }
@@ -33,89 +33,19 @@ impl fmt::Debug for Module {
 
 /// Parses a module to completion
 pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module, LexingError> {
-    let mut in_wire = false;
-    let mut in_reg = false;
     let mut vars: Vec<Var> = Vec::new();
-
-    trace!("parsing module");
 
     let io = match parse_module_io(lexer) {
         Ok(ret) => ret,
         Err(_) => ModuleIO::default(),
     };
 
-    while let Some(token) = lexer.next() {
-        if in_wire {
-            match token {
-                Ok(Token::Word) => match parse_name(lexer) {
-                    Ok(name) => {
-                        vars.push(Var {
-                            name,
-                            var_type: VarType::Wire,
-                            ..Default::default()
-                        });
-                        in_wire = false;
-                    }
-                    Err(_) => {
-                        error!(
-                            "unexpected error occurred parsing module wire name: '{}'",
-                            lexer.slice()
-                        );
-                        in_wire = false;
-                    }
-                },
-                Ok(Token::Comment) => match crate::parse_comment(lexer) {
-                    _ => (),
-                },
-                Ok(Token::WhiteSpace) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module wire: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => (),
-            }
-            continue;
-        } else if in_reg {
-            match token {
-                Ok(Token::Word) => match parse_name(lexer) {
-                    Ok(name) => {
-                        vars.push(Var {
-                            name,
-                            var_type: VarType::Reg,
-                            ..Default::default()
-                        });
-                        in_reg = false;
-                    }
-                    Err(_) => {
-                        error!(
-                            "unexpected error occurred parsing module reg name: '{}'",
-                            lexer.slice()
-                        );
-                        in_reg = false;
-                    }
-                },
-                Ok(Token::Comment) => match crate::parse_comment(lexer) {
-                    _ => (),
-                },
-                Ok(Token::WhiteSpace) => (),
-                Err(e) => {
-                    error!(
-                        "unexpected error occurred parsing module reg: '{}'",
-                        lexer.slice()
-                    );
-                    return Err(e);
-                }
-                _ => (),
-            }
-            continue;
-        }
+    trace!("parsing module");
 
+    while let Some(token) = lexer.next() {
         match token {
-            Ok(Token::Wire) => in_wire = true,
-            Ok(Token::Reg) => in_reg = true,
+            Ok(Token::Wire) => vars.push(parse_module_var(lexer, VarType::Wire)?),
+            Ok(Token::Reg) => vars.push(parse_module_var(lexer, VarType::Reg)?),
             Ok(Token::Comment) => match parse_comment(lexer) {
                 Ok(_) => (),
                 Err(e) => {
@@ -147,6 +77,52 @@ pub fn parse_module<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Module
     })
 }
 
+fn parse_module_var<'source>(
+    lexer: &mut Lexer<'source, Token>,
+    var_type: VarType,
+) -> Result<Var, LexingError> {
+    let mut width = 1;
+
+    trace!("parsing module variable of type {:?}", var_type);
+
+    while let Some(token) = lexer.next() {
+        match token {
+            Ok(Token::Word) => match parse_name(lexer) {
+                Ok(name) => {
+                    return Ok(Var {
+                        name,
+                        var_type,
+                        width,
+                        ..Default::default()
+                    });
+                }
+                Err(_) => {
+                    error!(
+                        "unexpected error occurred parsing module wire name: '{}'",
+                        lexer.slice()
+                    );
+                    break;
+                }
+            },
+            Ok(Token::OpenBracket) => width = var_types::parse_width(lexer)?,
+            Ok(Token::Comment) => match crate::parse_comment(lexer) {
+                _ => (),
+            },
+            Ok(Token::WhiteSpace) => (),
+            Err(e) => {
+                error!(
+                    "unexpected error occurred parsing module wire: '{}'",
+                    lexer.slice()
+                );
+                return Err(e);
+            }
+            _ => (),
+        }
+    }
+
+    Err(LexingError::ModuleWireNotFound)
+}
+
 /// Module I/O information
 ///
 /// Stores all inputs, outputs, and inouts for a given module
@@ -167,15 +143,15 @@ pub struct ModuleIO {
 
 impl fmt::Debug for ModuleIO {
     fn fmt(&self, _: &mut std::fmt::Formatter) -> fmt::Result {
-        debug!("ModuleIO {:?}", self.name);
+        debug!("MODULE I/O: {:?}", self.name);
         for input in self.inputs.clone() {
-            debug!("{:?}", input);
+            debug!("IO: {:?}", input);
         }
         for output in self.outputs.clone() {
-            debug!("{:?}", output);
+            debug!("IO: {:?}", output);
         }
         for inout in self.inouts.clone() {
-            debug!("{:?}", inout);
+            debug!("IO: {:?}", inout);
         }
         Ok(())
     }

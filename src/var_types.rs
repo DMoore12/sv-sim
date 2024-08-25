@@ -37,13 +37,25 @@ impl From<&str> for VarType {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Var {
     pub name: String,
     pub width: u64,
     pub var_type: VarType,
     pub state: bool,
     pub hi_z: bool,
+}
+
+impl Default for Var {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            width: 1,
+            var_type: VarType::default(),
+            state: false,
+            hi_z: false,
+        }
+    }
 }
 
 pub fn parse_input<'source>(lexer: &mut Lexer<'source, Token>) -> Result<Input, LexingError> {
@@ -184,7 +196,7 @@ pub fn parse_name<'source>(lexer: &mut Lexer<'source, Token>) -> Result<String, 
     Ok(name)
 }
 
-fn parse_width<'source>(lexer: &mut Lexer<'source, Token>) -> Result<u64, LexingError> {
+pub fn parse_width<'source>(lexer: &mut Lexer<'source, Token>) -> Result<u64, LexingError> {
     let mut start = 0;
     let mut end = 0;
     let mut end_found = false;

@@ -2,11 +2,14 @@
 
 _A simple SystemVerilog simulation tool written in rust_
 
+> This project is in a very early state
+
 ## Project Scope
 
-- Provide a simple SystemVerilog parser
-- Provide simple analysis tools
-- Allow design verification for simple projects
+- [X] Provide an incomplete, slightly broken SystemVerilog parser
+- [ ] Provide a simple SystemVerilog parser
+- [ ] Provide simple analysis tools
+- [ ] Allow design verification for simple projects
 
 ## Repository Contents
 

@@ -6,8 +6,8 @@ description = "A simple SystemVerilog simulation tool written in rust"
 repository = "https://github.com/DMoore12/sv-sim"
 readme = "README.md"
 license = "MIT"
-categories = ["compilers", "parsing", "simulation"]
-keywords = ["systemverilog", "sv-sim", "sv"]
+categories = ["parsing"]
+keywords = ["systemverilog", "parser"]
 exclude = [".*", "Better-Rust-Documentation*", "generate_docs.sh", "sv/*"]
 
 [badges]
