@@ -1,7 +1,5 @@
 # SystemVerilog Simulation
 
-![sv-sim logo](https://github.com/DMoore12/sv-sim/blob/main/sv-sim-logo.png?raw=true)
-
 _A simple SystemVerilog simulation tool written in rust_
 
 ## Project Scopt
