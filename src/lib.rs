@@ -20,9 +20,21 @@ pub mod var_types;
 pub mod sim_time;
 use sim_time::*;
 
-/// Module type and parsing
+/// Module type definitions
 pub mod module;
 use module::*;
+
+/// Logic parsing and simulation engine
+pub mod logic;
+pub use logic::*;
+
+/// Testbench utilities for simulation
+pub mod testbench;
+pub use testbench::*;
+
+/// Enhanced parser for SystemVerilog
+pub mod parser;
+pub use parser::*;
 
 /// Errors occurring due to incorrect character sequences
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -125,6 +137,78 @@ pub enum Token {
     /// Combinational logic start
     #[token("always_comb")]
     Comb,
+
+    /// Always block
+    #[token("always")]
+    Always,
+
+    /// Always_ff (sequential)
+    #[token("always_ff")]
+    AlwaysFF,
+
+    /// Case statement
+    #[token("case")]
+    Case,
+
+    /// Casez statement (with don't care)
+    #[token("casez")]
+    Casez,
+
+    /// Casex statement (with don't care)
+    #[token("casex")]
+    Casex,
+
+    /// Default case
+    #[token("default")]
+    Default,
+
+    /// Endcase
+    #[token("endcase")]
+    Endcase,
+
+    /// For loop
+    #[token("for")]
+    For,
+
+    /// While loop
+    #[token("while")]
+    While,
+
+    /// Generate block
+    #[token("generate")]
+    Generate,
+
+    /// Endgenerate
+    #[token("endgenerate")]
+    Endgenerate,
+
+    /// Genvar
+    #[token("genvar")]
+    Genvar,
+
+    /// Function
+    #[token("function")]
+    Function,
+
+    /// Endfunction
+    #[token("endfunction")]
+    Endfunction,
+
+    /// Task
+    #[token("task")]
+    Task,
+
+    /// Endtask
+    #[token("endtask")]
+    Endtask,
+
+    /// Return
+    #[token("return")]
+    Return,
+
+    /// Localparam
+    #[token("localparam")]
+    Localparam,
 
     /// If statement start
     #[token("if")]
@@ -282,6 +366,16 @@ pub enum Token {
     #[regex(r"\d+'bz")]
     HiZValue,
 
+    /// Hex value
+    ///
+    /// Takes form `X'hY` where `X` is the bit width and `Y` is the hex value
+    #[regex(r"\d+'h[0-9a-fA-F]+")]
+    HexValue,
+
+    /// Bitwise NOT
+    #[token("~")]
+    Tilde,
+
     /// Comment start
     #[regex(r"//")]
     Comment,
@@ -319,36 +413,53 @@ impl fmt::Debug for SimObject {
         debug!("{:?}", self.sim_time);
 
         for module in &self.mods {
-            format!("{module:?}");
+            let _ = format!("{module:?}");
         }
         Ok(())
     }
 }
 
-/// Parses a read SystemVerilog file
-///
-/// At this time, `parse_sv_file` can only return a single error
+/// Parses a read SystemVerilog file using the enhanced parser
 pub fn parse_sv_file(file_contents: String) -> Result<SimObject, LexingError> {
-    let mut lexer = Token::lexer(file_contents.as_str());
+    trace!("parsing sv file with enhanced parser");
+
+    let mut parser = SVParser::new(&file_contents);
     let mut sim_time = SimTime::default();
     let mut mods: Vec<Module> = Vec::new();
 
-    trace!("parsing sv file");
+    // Parse the entire file
+    loop {
+        parser.skip_whitespace();
 
-    while let Some(token) = lexer.next() {
-        match token {
-            Ok(Token::Module) => mods.push(parse_module(&mut lexer)?),
-            Ok(Token::BTick) => sim_time = parse_sim_time(&mut lexer)?,
-            Ok(Token::Comment) => parse_comment(&mut lexer)?,
-            Ok(Token::Newline) | Ok(Token::WhiteSpace) => (),
-            Err(e) => {
-                error!(
-                    "unexpected error occurred parsing sv file: '{}'",
-                    lexer.slice()
-                );
-                return Err(e);
+        match parser.current() {
+            Some(Ok(Token::BTick)) => {
+                // Parse timescale - for now just skip it
+                parser.advance();
+                while let Some(Ok(token)) = parser.current() {
+                    if matches!(token, Token::Newline) {
+                        parser.advance();
+                        break;
+                    }
+                    parser.advance();
+                }
             }
-            _ => warn!("{:?} not implemented", token.unwrap()),
+            Some(Ok(Token::Module)) => {
+                let module = parser.parse_module()?;
+                mods.push(module);
+            }
+            Some(Ok(Token::Comment)) => {
+                parser.skip_comment();
+            }
+            Some(Ok(_)) => {
+                // Skip unknown tokens
+                trace!("Skipping unknown token: {:?}", parser.current());
+                parser.advance();
+            }
+            Some(Err(e)) => {
+                error!("Lexer error: {:?}", e);
+                return Err(e.clone());
+            }
+            None => break,
         }
     }
 
